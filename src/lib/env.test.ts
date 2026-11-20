@@ -11,6 +11,7 @@ describe("env", () => {
 
   it("refuses the dev cookie secret in production", () => {
     expect(() => parseEnv({ NODE_ENV: "production" })).toThrow(/COOKIE_SECRET/);
+    expect(() => parseEnv({ NODE_ENV: "production", COOKIE_SECRET: "z".repeat(40) })).toThrow(/ORGANIZER_EMAILS/);
   });
 
   it("rejects short cookie secrets", () => {

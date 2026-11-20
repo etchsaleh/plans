@@ -17,6 +17,8 @@ export const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().optional(),
 
+  /** Comma list of emails allowed to sign in as organisers. Required in production. */
+  ORGANIZER_EMAILS: z.string().default(""),
   /** Optional: without it magic links are printed to the log and /dev/mailbox. */
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default("Plan <plans@localhost>"),
@@ -40,10 +42,20 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
   if (env.NODE_ENV === "production" && env.COOKIE_SECRET.startsWith("dev-only")) {
     throw new Error("COOKIE_SECRET must be set in production");
   }
+  if (env.NODE_ENV === "production" && !env.ORGANIZER_EMAILS.trim()) {
+    throw new Error("ORGANIZER_EMAILS must be set in production");
+  }
+  if (env.NODE_ENV === "production" && !env.SMTP_URL) {
+    throw new Error("SMTP_URL must be set in production (magic links)");
+  }
   return env;
 }
 
 let cached: Env | undefined;
 export function env(): Env {
   return (cached ??= parseEnv(process.env));
+}
+
+export function organizerEmails(e: Env): string[] {
+  return e.ORGANIZER_EMAILS.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 }
