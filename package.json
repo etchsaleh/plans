@@ -11,7 +11,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "e2e": "playwright test --trace off",
-    "worker": "tsx src/worker/index.ts",
+    "worker": "tsx --env-file-if-exists=.env.local src/worker/index.ts",
     "db:start": "scripts/dev-db.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",

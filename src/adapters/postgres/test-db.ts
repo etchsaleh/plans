@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { createDb, runMigrations, type Db } from "./db";
 
-export type TestDb = { db: Db; close: () => Promise<void> };
+export type TestDb = { db: Db; url: string; close: () => Promise<void> };
 
 /**
  * A fresh, migrated database per test file (drizzle migrations reference the
@@ -21,6 +21,7 @@ export async function createTestDb(): Promise<TestDb> {
   await runMigrations(db);
   return {
     db,
+    url: url.toString(),
     close: async () => {
       await pool.end();
       await admin.db.execute(sql.raw(`DROP DATABASE "${name}" WITH (FORCE)`));

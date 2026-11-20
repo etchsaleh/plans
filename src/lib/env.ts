@@ -23,6 +23,8 @@ export const envSchema = z.object({
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default("Plan <plans@localhost>"),
 
+  /** "pgboss" (default; needs `npm run worker`) or "inline" (dev/e2e: run searches in the web process). */
+  JOBS_MODE: z.enum(["pgboss", "inline"]).default("pgboss"),
   /** Comma list of verifier ids to enable. */
   VERIFIERS: z.string().default("mock,playtomic,royalparks"),
   /**
