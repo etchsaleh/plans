@@ -1,0 +1,13 @@
+[
+  {"resource_id":"32307b25-b98f-4ef0-bfb5-c379375d2c4e","start_date":"2026-11-21","slots":[
+    {"start_time":"17:00:00","duration":60,"price":"52 GBP"},
+    {"start_time":"18:00:00","duration":60,"price":"52 GBP"},
+    {"start_time":"18:00:00","duration":90,"price":"68.5 GBP"},
+    {"start_time":"21:00:00","duration":60,"price":"52 GBP"}]},
+  {"resource_id":"016123a4-aee0-4c5e-95ef-2a609e810803","start_date":"2026-11-21","slots":[
+    {"start_time":"18:00:00","duration":60,"price":"52 GBP"},
+    {"start_time":"20:00:00","duration":60,"price":"52 GBP"}]},
+  {"resource_id":"a51af7a6-1344-4935-b7c6-a72d2b5f78d7","start_date":"2026-11-21","slots":[
+    {"start_time":"16:30:00","duration":90,"price":"68.5 GBP"},
+    {"start_time":"20:30:00","duration":90,"price":"68.5 GBP"}]}
+]
