@@ -269,6 +269,9 @@ The worker runs as its own process (`npm run worker`, entry point `src/worker/in
 │   │   ├── (host)/…       # sign-in, groups, find plans, propose
 │   │   ├── p/[token]/page.tsx, opengraph-image.tsx, actions.ts
 │   │   └── api/…          # polling endpoint for live counts, auth callback
+│   ├── ui/
+│   │   ├── ios/           # our iOS primitives: NavBar (large title), TabBar, GroupedList/Cell, Sheet, SegmentedControl, ActionSheet, Toast
+│   │   └── spell/         # vendored Spell UI components (MIT, see §7a), adapted to our tokens
 │   └── lib/               # cookies/signing, env (zod-validated), logger (pino), time utils
 ├── drizzle.config.ts  next.config.ts  playwright.config.ts  vitest.config.ts
 └── README.md
@@ -291,6 +294,39 @@ ESLint `import/no-restricted-paths` (or `eslint-plugin-boundaries`) enforces the
 
 ---
 
+## 7a. UI: native iOS feel
+
+**Goal:** when someone opens the link from WhatsApp on an iPhone, it should feel like an iOS app, not a website. "Add to Home Screen" should then run as a standalone PWA.
+
+**Base layer: our own iOS primitives (`src/ui/ios`), built on Tailwind v4.** Spell UI doesn't provide them (see below), so I'll build a small set myself:
+* **Type and colour:** the system font stack (`-apple-system, "SF Pro Text", system-ui`), Dynamic Type sizes from the iOS scale (Large Title 34, Title 3 20, Body 17, Footnote 13), and iOS system colours as CSS tokens (systemBlue, systemGreen, systemRed, label/secondaryLabel, systemGroupedBackground, separator), with automatic dark mode.
+* **Layout:** large-title navigation bar that collapses on scroll with a translucent blur; grouped inset lists (cells with chevrons and hairline separators); bottom tab bar for the host; `viewport-fit=cover` and `env(safe-area-inset-*)` everywhere.
+* **Sheets:** bottom sheets with detents and drag-to-dismiss (`vaul`) for "Which one are you?", alternatives and sharing; an iOS-style action sheet for host actions.
+* **Controls:** a segmented control for Restaurant/Padel; switches; 44pt minimum hit targets; press states that scale and dim slightly; `-webkit-tap-highlight-color: transparent`; no hover-only affordances.
+* **Motion:** spring physics via `motion`, all of it disabled under `prefers-reduced-motion`.
+* **Home screen app:** `apple-mobile-web-app-capable`, status-bar-style `black-translucent`, apple-touch-icon and splash images.
+
+**Spell UI ([xxtomm/spell-ui](https://github.com/xxtomm/spell-ui), MIT) adds polish on top of the base layer.** It is a copy-paste component collection: 33 components, React 19 + Tailwind v4 + `motion`, with shadcn registry metadata. It isn't published on npm. Its docs site wouldn't resolve from my sandbox, so I couldn't confirm an official install command. I'll **vendor the source files into `src/ui/spell/`**, keeping the MIT notice and the upstream commit hash, and adapt them to our tokens. This also lets us tune them to feel iOS-native.
+
+| Spell component | Where it's used |
+|---|---|
+| `animated-checkbox` | the moment you vote Yes, and each member's tick in the "who's in" list |
+| `spinner` / `bars-spinner` | iOS-style activity indicator during "Re-checking availability…" |
+| `shimmer-text` | "Checking live availability…" while verification runs |
+| `slide-up-text` / `randomized-text` | live vote counts and "verified 2 min ago" ticking over |
+| `words-stagger` / `blur-reveal` | plan card entrance; the "It's on! 🎉 Book now" reveal |
+| `pop-button` / `rich-button` / `flow-button` | the main Yes / No / Book now buttons (restyled as iOS filled buttons) |
+| `badge` | the "Verified · 3 min ago" pill (green), "Stale – rechecking" (orange), "Gone" (red) |
+| `fallback-avatar` | member avatars (initials) in the voting list |
+| `copy-button` | "Copy link" in the share sheet |
+| `qr-code` | "Show QR" in the share sheet, for sharing in person |
+| `label-input` | sign-in email and the "Your name" field |
+| `tilt-card` | subtle tilt on the venue hero card (off on touch if it feels janky) |
+
+Deliberately **not** used: `light-rays` (pulls in three.js, too heavy for a link opened over mobile data), and `tweet`, `spotify-card`, `signature`, `perspective-book`, `marquee`/`logos-carousel` and `kbd`, because none of them fits this app.
+
+**Performance budget:** the plan page must stay fast in WhatsApp's in-app browser over 4G. It is server-rendered, and only the voting island is client-side. The JS target is under 120 KB gzipped, and Spell components are lazy-loaded where possible.
+
 ## 8. Testing strategy
 
 | Layer | Tool | What |
@@ -299,7 +335,8 @@ ESLint `import/no-restricted-paths` (or `eslint-plugin-boundaries`) enforces the
 | Application | Vitest + in-memory fakes | use cases end to end without I/O: idempotency of generation and verification, a re-verify race when two people vote at once |
 | Contract | Vitest, shared suites | `runAvailabilityVerifierContract(makeVerifier, fixtures)`: never throws, returns UNKNOWN on timeout, 5xx or malformed payloads, `checkedAt` set and not in the future, `reason` present for non-AVAILABLE, honours `AbortSignal`, never AVAILABLE for an unsupported venue. Real adapters run it against **recorded fixtures** (msw). A live smoke run is opt-in with `LIVE_ADAPTER_TESTS=1`. |
 | Persistence | Vitest + real Postgres | repositories, unique constraints, migration up from empty |
-| E2E | Playwright, `devices['Pixel 7']` and `iPhone 13` | host creates a group and proposes a plan; 3 friend browser contexts open `/p/[token]`, claim names and vote Yes → BOOKABLE → Book now link. A second scenario uses the mock verifier's "slot disappears on re-verify" mode → SLOT_GONE with alternatives shown. |
+| Visual | Playwright, `devices['iPhone 15']` | screenshot snapshots of `/dev/ui` and the plan page in light and dark mode, to catch visual regressions |
+| E2E | Playwright, `devices['iPhone 15']` (primary) and `Pixel 7` | host creates a group and proposes a plan; 3 friend browser contexts open `/p/[token]`, claim names and vote Yes → BOOKABLE → Book now link. A second scenario uses the mock verifier's "slot disappears on re-verify" mode → SLOT_GONE with alternatives shown. |
 
 The MockVerifier is driven by scenarios such as `always-available`, `flaky`, `gone-on-reverify` and `unknown`, selected per venue in the seed data. This keeps the e2e tests deterministic.
 
@@ -308,9 +345,10 @@ The MockVerifier is driven by scenarios such as `always-available`, `flaky`, `go
 ## 9. Build order (each step = tests + commit)
 
 **Slice 0 — scaffold**
-1. Next.js 15 + TypeScript + Tailwind + ESLint boundary rules + Vitest + Playwright config.
+1. Next.js 16 + React 19 + TypeScript + Tailwind v4 + motion + ESLint boundary rules + Vitest + Playwright config.
 2. Drizzle + the Postgres schema + the first migration, plus `scripts/dev-db.sh` and a `docker-compose.yml` for local use.
 3. Zod-validated env loading, pino logger, composition root skeleton.
+3b. iOS UI foundation: design tokens (light/dark), safe areas, `ui/ios` primitives, vendored Spell UI components, and a `/dev/ui` gallery page with Playwright screenshot tests on the iPhone viewport.
 
 **Slice 1 — host, group, mock verifier and plan page voting, end to end**
 4. Domain: availability, freshness, plan state machine, voting rules, all unit-tested.
