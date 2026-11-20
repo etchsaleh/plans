@@ -7,6 +7,8 @@ export type CheckOptions = {
   signal?: AbortSignal;
   /** Re-checks (lock-in, stale view) must hit the source, not a cache. */
   bypassCache?: boolean;
+  /** Links the audit snapshot to the request it was made for. */
+  context?: { requestId?: string; candidateId?: string; planId?: string };
 };
 
 /**

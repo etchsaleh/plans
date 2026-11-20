@@ -53,7 +53,7 @@ export function withAudit(
     async check(venue, q, opts) {
       const started = deps.clock.now().getTime();
       const r = await inner.check(venue, q, opts);
-      const snapshot = { ...r, id: uuid(), purpose: opts.purpose, latencyMs: deps.clock.now().getTime() - started, ...ctx };
+      const snapshot = { ...r, id: uuid(), purpose: opts.purpose, latencyMs: deps.clock.now().getTime() - started, ...ctx, ...opts.context };
       deps.logger?.info(
         {
           event: "availability.checked",
@@ -79,7 +79,7 @@ export function withAudit(
         deps.logger?.warn({ err: e, snapshotId: snapshot.id }, "failed to persist availability snapshot");
         return { ...r, status: "UNKNOWN", reason: "audit log write failed" };
       }
-      return r;
+      return { ...r, snapshotId: snapshot.id };
     },
   };
 }

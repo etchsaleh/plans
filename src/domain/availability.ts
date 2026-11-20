@@ -37,6 +37,8 @@ export type VerificationResult = {
   matched?: MatchedSlot;
   /** Required for UNAVAILABLE and UNKNOWN. */
   reason?: string;
+  /** Set by the audit decorator: id of the persisted snapshot backing this result. */
+  snapshotId?: string;
 };
 
 export type AvailabilitySnapshot = VerificationResult & {
@@ -45,6 +47,7 @@ export type AvailabilitySnapshot = VerificationResult & {
   latencyMs?: number;
   candidateId?: string;
   planId?: string;
+  requestId?: string;
 };
 
 /** Nothing older than this is presented as bookable without a re-check. */

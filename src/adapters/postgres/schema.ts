@@ -5,7 +5,6 @@ import {
   integer,
   jsonb,
   pgTable,
-  real,
   text,
   timestamp,
   uniqueIndex,
@@ -17,14 +16,10 @@ import {
   ACTIVITIES,
   AVAILABILITY_STATUSES,
   BUDGET_BANDS,
-  CANDIDATE_STATUSES,
   CHECK_PURPOSES,
   CHECK_TIERS,
-  HANDOFF_METHODS,
-  PLAN_STATUSES,
-  RSVP_VALUES,
-  SEARCH_STATUSES,
 } from "@/domain/vocabulary";
+import { REQUEST_STATUSES, type Search } from "@/domain/request";
 
 const citext = customType<{ data: string }>({ dataType: () => "citext" });
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
@@ -91,49 +86,6 @@ export const venues = pgTable(
   (t) => [uniqueIndex("venues_provider_external_uq").on(t.provider, t.externalId)],
 );
 
-// ── search & candidates ─────────────────────────────────────────────────────
-export const searches = pgTable("searches", {
-  id: uuid("id").primaryKey(),
-  hostParticipantId: uuid("host_participant_id").notNull().references(() => participants.id),
-  crewId: uuid("crew_id").references(() => crews.id, { onDelete: "set null" }),
-  activity: text("activity", { enum: ACTIVITIES }).notNull(),
-  windowStart: ts("window_start").notNull(),
-  windowEnd: ts("window_end").notNull(),
-  partySize: integer("party_size").notNull(),
-  areas: text("areas").array().notNull().default(sql`'{}'::text[]`),
-  notes: text("notes"),
-  budgetBand: text("budget_band", { enum: BUDGET_BANDS }),
-  trigger: text("trigger", { enum: ["host", "schedule"] }).notNull(),
-  status: text("status", { enum: SEARCH_STATUSES }).notNull().default("QUEUED"),
-  error: text("error"),
-  idempotencyKey: text("idempotency_key").notNull().unique(),
-  createdAt: createdAt(),
-  finishedAt: ts("finished_at"),
-});
-
-export const candidates = pgTable(
-  "candidates",
-  {
-    id: uuid("id").primaryKey(),
-    searchId: uuid("search_id").notNull().references(() => searches.id, { onDelete: "cascade" }),
-    venueId: uuid("venue_id").notNull().references(() => venues.id),
-    activity: text("activity", { enum: ACTIVITIES }).notNull(),
-    slotStart: ts("slot_start").notNull(),
-    durationMins: integer("duration_mins").notNull(),
-    partySize: integer("party_size").notNull(),
-    score: real("score").notNull(),
-    rationale: text("rationale"),
-    ranker: text("ranker").notNull(),
-    rankerModel: text("ranker_model"),
-    status: text("status", { enum: CANDIDATE_STATUSES }).notNull().default("PENDING"),
-    latestSnapshotId: uuid("latest_snapshot_id"),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    uniqueIndex("candidates_idem_uq").on(t.searchId, t.venueId, t.slotStart, t.partySize),
-  ],
-);
-
 // ── availability audit log (append-only) ────────────────────────────────────
 export const verificationPayloads = pgTable("verification_payloads", {
   id: uuid("id").primaryKey(),
@@ -150,6 +102,7 @@ export const availabilitySnapshots = pgTable(
     venueId: uuid("venue_id").notNull().references(() => venues.id),
     candidateId: uuid("candidate_id"),
     planId: uuid("plan_id"),
+    requestId: uuid("request_id"),
     verifier: text("verifier").notNull(),
     tier: text("tier", { enum: CHECK_TIERS }).notNull(),
     source: text("source").notNull(),
@@ -175,49 +128,115 @@ export const availabilitySnapshots = pgTable(
   ],
 );
 
-// ── plans & RSVPs ───────────────────────────────────────────────────────────
-export const plans = pgTable("plans", {
+// ── sessions & groups ──────────────────────────────────────────────────────
+export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey(),
-  token: text("token").notNull().unique(),
-  hostParticipantId: uuid("host_participant_id").notNull().references(() => participants.id),
-  hostSecretHash: text("host_secret_hash").notNull(),
-  searchId: uuid("search_id").references(() => searches.id),
-  candidateId: uuid("candidate_id").notNull().references(() => candidates.id),
-  venueId: uuid("venue_id").notNull().references(() => venues.id),
-  activity: text("activity", { enum: ACTIVITIES }).notNull(),
-  slotStart: ts("slot_start").notNull(),
-  durationMins: integer("duration_mins").notNull(),
-  partySize: integer("party_size").notNull(),
-  quorum: text("quorum", { enum: ["party_size"] }).notNull().default("party_size"),
-  status: text("status", { enum: PLAN_STATUSES }).notNull().default("OPEN"),
-  confirmingSnapshotId: uuid("confirming_snapshot_id"),
-  replacedByPlanId: uuid("replaced_by_plan_id"),
+  /** sha256 of the opaque cookie value; the raw value only lives in the browser cookie */
+  tokenHash: text("token_hash").notNull().unique(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   expiresAt: ts("expires_at").notNull(),
   createdAt: createdAt(),
-  updatedAt: ts("updated_at").notNull().defaultNow(),
-  version: integer("version").notNull().default(0),
 });
 
-export const rsvps = pgTable(
-  "rsvps",
+export const groups = pgTable("groups", {
+  id: uuid("id").primaryKey(),
+  organizerUserId: uuid("organizer_user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  createdAt: createdAt(),
+});
+
+export const groupMembers = pgTable(
+  "group_members",
+  {
+    groupId: uuid("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
+    participantId: uuid("participant_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["organizer", "member"] }).notNull(),
+    joinedAt: ts("joined_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("group_members_uq").on(t.groupId, t.participantId)],
+);
+
+// ── requests & options ─────────────────────────────────────────────────────
+export const searchRequests = pgTable(
+  "search_requests",
   {
     id: uuid("id").primaryKey(),
-    planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "cascade" }),
-    participantId: uuid("participant_id").notNull().references(() => participants.id),
-    value: text("value", { enum: RSVP_VALUES }).notNull(),
+    /** opaque invite token used in the shared link (/r/<token>) */
+    shareToken: text("share_token").notNull().unique(),
+    organizerUserId: uuid("organizer_user_id").notNull().references(() => users.id),
+    groupId: uuid("group_id").notNull().references(() => groups.id),
+    search: jsonb("search").$type<Search>().notNull(),
+    status: text("status", { enum: REQUEST_STATUSES }).notNull(),
+    selectedOptionId: uuid("selected_option_id"),
+    bookingReference: text("booking_reference"),
+    version: integer("version").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("rsvps_plan_participant_uq").on(t.planId, t.participantId)],
+  (t) => [index("search_requests_organizer_idx").on(t.organizerUserId, t.createdAt.desc())],
 );
 
-export const bookingHandoffs = pgTable("booking_handoffs", {
+export const requestStatusHistory = pgTable(
+  "request_status_history",
+  {
+    id: uuid("id").primaryKey(),
+    requestId: uuid("request_id").notNull().references(() => searchRequests.id, { onDelete: "cascade" }),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
+    cause: text("cause").notNull(),
+    actor: text("actor").notNull(),
+    at: ts("at").notNull().defaultNow(),
+  },
+  (t) => [index("request_history_idx").on(t.requestId, t.at)],
+);
+
+export const options = pgTable(
+  "options",
+  {
+    id: uuid("id").primaryKey(),
+    requestId: uuid("request_id").notNull().references(() => searchRequests.id, { onDelete: "cascade" }),
+    venueId: uuid("venue_id").notNull().references(() => venues.id),
+    startsAt: ts("starts_at").notNull(),
+    endsAt: ts("ends_at").notNull(),
+    partySize: integer("party_size").notNull(),
+    description: text("description").notNull(),
+    checkedAt: ts("checked_at").notNull(),
+    tier: text("tier", { enum: CHECK_TIERS }).notNull(),
+    source: text("source").notNull(),
+    snapshotId: uuid("snapshot_id").references(() => availabilitySnapshots.id),
+    priceText: text("price_text"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("options_slot_uq").on(t.requestId, t.venueId, t.startsAt)],
+);
+
+export const preferences = pgTable(
+  "preferences",
+  {
+    optionId: uuid("option_id").notNull().references(() => options.id, { onDelete: "cascade" }),
+    participantId: uuid("participant_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
+    value: text("value", { enum: ["up", "down"] }).notNull(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("preferences_uq").on(t.optionId, t.participantId)],
+);
+
+export const requestRsvps = pgTable(
+  "request_rsvps",
+  {
+    requestId: uuid("request_id").notNull().references(() => searchRequests.id, { onDelete: "cascade" }),
+    participantId: uuid("participant_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
+    value: text("value", { enum: ["in", "out"] }).notNull(),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("request_rsvps_uq").on(t.requestId, t.participantId)],
+);
+
+/** Dev-only record of mail the console mailer "sent" (magic links), shown at /dev/mailbox. */
+export const devMailbox = pgTable("dev_mailbox", {
   id: uuid("id").primaryKey(),
-  planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "cascade" }),
-  provider: text("provider").notNull(),
-  method: text("method", { enum: HANDOFF_METHODS }).notNull(),
-  url: text("url").notNull(),
-  prefilled: jsonb("prefilled").$type<string[]>().notNull().default([]),
+  to: text("to").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
   createdAt: createdAt(),
-  clickedAt: ts("clicked_at"),
 });

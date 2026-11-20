@@ -28,6 +28,7 @@ export class PgSnapshotStore implements SnapshotStore {
         venueId: s.query.venueId,
         candidateId: s.candidateId ?? null,
         planId: s.planId ?? null,
+        requestId: s.requestId ?? null,
         verifier: s.verifier,
         tier: s.tier,
         source: s.evidence.source,
