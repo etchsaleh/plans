@@ -1,43 +1,41 @@
-# Plan — MVP build plan (v2)
+# Plan — MVP build plan (v3)
 
-Status: **v2.1.** Live checks are enabled for Playtomic and the Royal Parks, with the owner confirming permission on 2026-11-20 (see [adapters status](adapters/README.md)). The HUMAN tier stays as the fallback for link-only venues.
+Status: **v3 draft, awaiting your OK.** This version adds the **Instinct email bridge** (full design in [`instinct-bridge.md`](instinct-bridge.md)). Live checks against Playtomic and the Royal Parks are built and gated (see [adapters status](adapters/README.md)).
 
-Changes since v1: there's no group setup and no roster of names. Quorum is now **party size**. Hosts don't need to log in. There's a check-tier ladder (§2), and a Spell UI / iOS layer (§8).
+What v3 changes and why:
+
+| Area | v2 | v3 |
+|---|---|---|
+| Where availability comes from | direct verifiers only | **direct verifiers** (instant, for the venues we support) **+ Instinct over email** (asynchronous; anything Instinct is registered to check, including restaurants and cinema) |
+| Booking | "Book now" deep link | **Never booked in-app.** "Choose this option", then "Approve the final booking and terms with Instinct on WhatsApp. Nothing is booked yet." Booked only on a `booking_result: confirmed` carrying provider evidence, or the organiser's manual "We're booked" with a reference |
+| Host | anonymous | **signed-in organiser** (magic link, owner allow-list), because only the organiser can trigger mail to their own assistant |
+| Friends | anonymous link + name | unchanged in feel, but the link is now an **invitation into a group**, so organiser-only data stays private |
+| A plan | one candidate, yes/no | a **request with several options**: friends mark 👍/👎 and "I'm in", and the organiser chooses |
+| Freshness | "bookable" if 15 minutes old or less | "checked X min ago", with "older check" after 15 min. **A check is never a hold**, so "bookable" goes away as a user-facing word |
+| Categories | restaurant, padel, tennis | **+ cinema** (through Instinct only) |
 
 ---
 
-## 0. Product, in one screen
+## 0. Product, in one screen (v3)
 
-**Host (about 15 seconds, no signup):**
-1. Open the app. The **"What's the plan?"** sheet asks:
-   - **What:** Dinner · Padel · Tennis (segmented control).
-   - **When:** Tonight · Tomorrow · Sat · Sun · pick a date, plus a time band (lunch, early evening, late).
-   - **How many:** a stepper, defaulting to the last value, otherwise 4.
-   - **Where:** London area chips, remembered from last time.
-   - Optional: "Anything to avoid?" as free text ("one veggie, no seafood"), and a budget band (£ / ££ / £££).
-2. The app shows **options that are already checked** for exactly that party size. They come straight from a pre-checked pool, or are checked on the spot while a shimmer shows. Every card shows its check tier and age ("Verified 3 min ago").
-3. Tap one, then **Share**. The iOS share sheet opens with WhatsApp first, and the link shows a rich preview.
+**Organiser (signed in):**
+1. **"What's the plan?"** sheet: category (Dinner · Padel · Tennis · Cinema), **explicit date**, time window, party size, area or venue, optional budget and notes.
+2. The server routes the search:
+   - **Direct path:** if the venues are covered by a live verifier (Playtomic or Royal Parks), options come back in seconds and each card shows "Verified 3 min ago".
+   - **Instinct path:** if the search fits an **active registered action**, the app emails Instinct and shows **"Waiting for Instinct"**, with no countdown. When the reply is ingested, the options appear. Each shows "Checked by Instinct 12 min ago · source ↗", the venue, London local time, party size, the price (or "Price unknown") and the terms (or "Cancellation terms unknown").
+   - **Neither:** the app explains why ("No registered action covers Dishoom on Fridays") and offers to request one. Registering the action happens over WhatsApp.
+3. **Share**: the iOS share sheet sends an invite link to the WhatsApp group.
 
-**Friends (about 3 seconds):**
-1. Open the link in WhatsApp. They see a big venue card, the time, "Table for 4", how long ago it was checked, and who's in.
-2. They tap **I'm in** or **Can't make it**. The first time, a sheet asks "What should we call you?" and the cookie remembers the answer after that.
+**Friends (no signup):** open the invite and enter a name once. They see the options and mark **👍/👎** on each, plus **I'm in / Can't make it**. They never see organiser-only details: provider references, raw source data, or terms you haven't approved for sharing.
 
-**It happens when:**
-* the number of people who are **in reaches the party size** (the host counts as in), **or** the host taps **Lock it in now**, whichever comes first. The host is never held up by a slow friend.
-* At that point the app **re-checks immediately**:
-  - **Still free:** the host gets **Book now**, a deep link with as much prefilled as the source allows. Everyone else sees "Sam is booking…".
-  - **Gone:** the app shows the nearest checked alternatives (same activity, ±90 minutes, same party size). The host taps one, and the votes carry over to the new plan.
-* If more people say they're in than the party size allows, the host sees "5 are in, table is for 4. Re-check for 5?" in one tap.
+**Choosing:**
+- The organiser taps **"Choose this option"**. This records a *preference only*.
+- The next screen says **"Selected. Approve the final booking and terms with Instinct on WhatsApp. Nothing is booked yet."** It shows the request ID and option ID, a copy button, and a prefilled `wa.me` message to Instinct for you to send yourself.
+- Instinct re-checks the slot and asks you to approve the final slot, total, fees and cancellation terms. If anything changes, it asks again.
+- **Booked** only happens on provider evidence: a threaded `booking_result: confirmed` (if agreed), or your manual "We're booked" entered with a provider reference. An `unknown` result means "needs reconciling" and never triggers a retry.
 
-**Optional, later in the flow:** "Save this crew" (email magic link). Saving keeps the defaults (size, areas, notes) and opts the crew into **"Thursday picks"**, the scheduled agent that pre-checks options for the weekend and has a shareable plan ready.
-
-### Why party-size quorum instead of everyone voting by name
-Availability depends only on the **party size**, so that's the number that matters. A named roster adds setup and goes stale (WhatsApp groups and actual attendees differ). It also forces a "which one are you?" step on every friend, and it blocks the plan when one person never opens the link. With party-size quorum:
-- there's no setup, and the plan works the moment the host shares it;
-- friends can forward it, and whoever says they're in first gets the seats;
-- the host can always lock it in early, so the plan isn't held hostage by the slowest person.
-
-*Kept:* a named, all-must-confirm mode can be added later as a per-plan setting (`quorum: 'party_size' | 'named'`), because the domain models quorum as a strategy.
+### Why keep party size and "I'm in"
+Party size still drives every check. "I'm in" tells the organiser who's coming, so if 5 are in for a table for 4, they know to change the search. It no longer triggers anything automatically, because the commitment now happens in WhatsApp.
 
 ---
 
@@ -50,7 +48,9 @@ Availability depends only on the **party size**, so that's the number that matte
 
 ---
 
-## 2. Verification reality, and the check-tier ladder (⚠️ needs your call)
+## 2. Verification reality, and the check-tier ladder
+
+> v3: a fifth source of options is **Instinct over email**, shown as "Checked by Instinct". It has its own evidence (`checked_at`, `source_url`) and is never treated as a hold. See [instinct-bridge.md](instinct-bridge.md).
 
 The research (see [`docs/adapters/README.md`](adapters/README.md)) found **no London source that a third party may read automatically without a contract or permission**:
 
@@ -106,27 +106,28 @@ isBookable(snap, now) =
   && snap.slot.start - now >= minLeadTime(activity)
 ```
 
-### 3.2 Plan state machine
+### 3.2 Search request state machine (replaces the v2 plan states)
 ```
-                 inCount ≥ partySize  OR  host "Lock it in"
- OPEN ─────────────────────────────────────────────────────▶ CONFIRMING
-  │  ▲                                                          │
-  │  └──── re-check UNKNOWN (retryable) ◀───────────────────────┤
-  │                                       AVAILABLE             │  UNAVAILABLE
-  │                              BOOKABLE ◀─────────────────────┼────────────▶ SLOT_GONE ──host picks alt──▶ (new Plan, RSVPs carried over)
-  │                                  │ host taps Book now
-  │                                  ▼
-  │                              HANDED_OFF ──host "We're booked ✓"──▶ BOOKED   (extension point: payments / API booking)
-  ├── host cancels ──▶ CANCELLED
-  └── slot start − lead time passed ──▶ EXPIRED   (expire_plans job; also enforced on read)
+ DRAFT ─submit─▶ QUEUED ─sent─▶ WAITING ─────────────── reply ingested ───────────────┐
+   │   (direct path: QUEUED ─checks done─▶ RESULTS)        │ timeout: shows "No reply yet" (still WAITING;
+   │                                                       │  only a manual follow-up re-sends)
+   ▼                                                       ▼
+ REJECTED (no registered action / out of scope)   RESULTS | NO_AVAILABILITY | NEEDS_CLARIFICATION | UNVERIFIED | ERROR
+                                                       │ organiser "Choose this option"
+                                                       ▼
+                                                   SELECTED ──booking_result confirmed + provider evidence──▶ BOOKED
+                                                       │      ──booking_result failed──▶ BOOKING_FAILED (choose another)
+                                                       │      ──booking_result unknown──▶ NEEDS_RECONCILIATION (never auto-retries)
+                                                       └── organiser picks another option ──▶ SELECTED (history kept)
+ any open state ── organiser cancels ──▶ CANCELLED      any state ── slot passed ──▶ EXPIRED
 ```
-* `BOOKABLE` is valid only while the confirming snapshot is 15 minutes old or less. After that, the page drops back to "re-checking".
-* `transition(plan, event, now) → Plan | DomainError` is pure, and table-tested for every state and event pair.
+* The send state is tracked separately (`pending | sent | uncertain | failed`). `uncertain` is reconciled against the Sent folder before any retry, with the same request ID.
+* A late reply never overwrites a newer state (it's stored as `superseded`). Nothing ever leaves `BOOKED` except an explicit organiser action.
+* `transition(request, event, now)` is pure and table-tested. That includes the brief's rule that votes, clicks and "approved" email text can never reach `BOOKED`.
 
-### 3.3 RSVP rules
-* One RSVP per (plan, participant), upserted. The host is automatically `IN`.
-* The quorum strategy is `PartySizeQuorum`, with `NamedQuorum` as an extension point.
-* Changing an RSVP after `BOOKABLE` is allowed and shows to the host, but doesn't undo the state.
+### 3.3 RSVP and preference rules
+* One RSVP (`in`/`out`) per (request, participant), and one preference (👍/👎) per (option, participant), both upserted. The organiser is automatically `in`.
+* Neither triggers anything automatically. They inform the organiser's choice.
 
 ---
 
@@ -275,36 +276,29 @@ Left out: `light-rays` (it pulls in three.js), and `tweet`, `spotify-card`, `sig
 
 ## 10. Build order (each step = tests + commit)
 
-**Slice 0: scaffold**
-1. Next 16, React 19, TS, Tailwind v4, ESLint boundaries, Vitest, Playwright.
-2. Drizzle schema, first migration, `dev-db.sh` / docker-compose.
-3. env (zod), logger, composition root.
-4. iOS UI foundation: tokens, `ui/ios` primitives, vendored Spell UI, `/dev/ui` gallery.
+**Done:** Slice 0 (scaffold, DB, env, iOS UI kit). Verification core: domain rules, `PoliteHttp`, safety and audit decorators, contract suite, mock, Playtomic and Royal Parks verifiers, audit store, `npm run check`.
 
-**Slice 1: anonymous host, search, mock verifier, plan page RSVP, end to end**
-5. Domain: availability, tiers, freshness, quorum, state machine.
-6. Ports, in-memory fakes, contract suites, mock adapters.
-7. Verifier decorators.
-8. Postgres repositories.
-9. pg-boss worker, `generate_candidates` and `verify_candidate` (heuristic ranker).
-10. "What's the plan?" sheet, then the results list, then the plan and share.
-11. `/p/[token]`: name sheet, I'm in / Can't make it, live counts, freshness, OG image.
-12. Seed data and e2e.
+**Slice A: requests, options, roles** (the brief's step 1: database and status UI)
+1. Domain: `SearchRequest` state machine, `Option`, `Selection`, `BookingResult` rules (evidence required; unknown never retries), and role-based field visibility.
+2. Schema migration for the tables in [instinct-bridge §7](instinct-bridge.md#7-data-model-additions), plus append-only status history.
+3. Organiser magic-link auth (owner allow-list), group invitations, and the participant cookie.
+4. Direct path: search → verifiers → options (reusing the built verifiers).
+5. UI: "What's the plan?" sheet, then waiting/results states for every status, then option cards, then preferences and "I'm in", then "Choose this option", then the "Approve in WhatsApp" screen. Playwright on iPhone.
 
-**Slice 2: lock-in, re-check, handoff**
-13. Quorum or lock-in triggers a re-check, then BOOKABLE or SLOT_GONE, plus a re-check on view when stale.
-14. Alternatives and carry-over. Handoff, Book now, "We're booked ✓".
+**Slice B: Instinct bridge on mock mail** (the brief's step 2: validation, correlation, dedup, review)
+6. Ports `AssistantMailTransport` / `AssistantSearchGateway`, the mock mailbox, and scripted Instinct fixtures.
+7. Action registry and scope validation, request IDs, subject and body builder, outbox and `send_assistant_request` job (acceptance test 1).
+8. Inbound pipeline: classify, correlate, authenticate, extract the new-text JSON, validate with zod, dedupe, apply or send to review. Tests for acceptance 2–8.
+9. `/admin/assistant`: actions (register, pause, revoke), the setup checklist, the live-mode gate, the review queue and failed requests (acceptance 10).
+10. Privacy: role filters, log redaction, retention job, and a bundle scan for secrets (acceptance 9).
 
-**Slice 3: Playtomic, plus tennis (Royal Parks / ClubSpark)**
-15. Link-only handoffs and their contract tests. The HUMAN-tier check flow (if Q-A is yes). The `RoyalParksVerifier` against fixtures, behind a flag.
+**Slice C: real mailbox in a test environment** (the brief's step 3). This needs your mailbox decision (Q-E).
+11. Gmail API (or IMAP/SMTP) adapter, credentials from the secret manager, the `poll_mailbox` job, and Sent-folder reconciliation. Tested against a test mailbox, with no mail sent to Instinct.
 
-**Slice 4: restaurants**
-16. OpenTable and website link-only handoffs, a curated London catalogue, and the HUMAN tier.
+**Slice D: first live round trip, after the WhatsApp agreement** (the brief's step 4)
+12. Tick the checklist, enable **one** action for **one** organiser, run one read-only search, and inspect the stored request, reply, parse and options together before widening.
 
-**Slice 5: agent and expiry**
-17. Anthropic ranker (stubbed client in tests, and a guard test that it never touches availability).
-18. `expire_plans`, `prewarm_pool`, "Save this crew" (magic link), `weekly_picks`.
-19. README: setup, env vars, worker, adding an adapter, the audit page.
+**Later (from v2, unchanged):** Anthropic ranker for direct-path discovery, `expire_requests`, "Save this crew", and weekly picks (which for Instinct actions would be one scheduled email within the agreed frequency).
 
 ---
 
@@ -312,15 +306,17 @@ Left out: `light-rays` (it pulls in three.js), and `tweet`, `spotify-card`, `sig
 
 **Settled:**
 - London only.
-- No existing partner access.
-- Quorum is party size, and the host can lock it in early.
-- Host doesn't need to log in. Email login is only for saved crews and weekly picks.
 - Spell UI and the iOS look.
 - Custom magic-link auth.
 - Deploy as web + worker from one Docker image.
+- Live direct checks enabled for Playtomic and the Royal Parks, with permission asserted by the owner.
+- **Booking only through WhatsApp approval with Instinct. The app never books or charges.**
+- The organiser signs in; friends join by invitation.
 
 **Open:**
-- **Q-A:** should the HUMAN tier count as verified? (§2. Blocks Slices 3 and 4, not 0 to 2.)
-- **Q-B:** will you send the permission and partner emails (Royal Parks, OpenTable, Enable)? I can draft them.
-- **Q-C:** do you want a Google Places API key for discovery? Without one, discovery uses a curated catalogue.
-- **Q-D:** what's the LLM budget cap? The default is a small model, at most 20 candidates per search and 30 searches per participant per day.
+- **Q-E: which mailbox does the app send from and read?** My recommendation is a dedicated Google Workspace or Gmail address, using the Gmail API with an OAuth refresh token stored as a secret. Gmail gives us thread IDs and the authentication results we check. IMAP/SMTP works with any provider, but its security signals are weaker.
+- **Q-F: which first action should we register with Instinct?** For example: read-only checks for Rocket Padel Battersea, weekdays after 19:00, parties of 2–8, horizon 14 days, at most 3 searches a day. I'll seed it as a **draft** action. It stays off until you mark it agreed.
+- **Q-G: should direct verifiers keep running next to Instinct?** I recommend yes. They're instant for the venues they cover, and they also help you sense-check Instinct's results. The alternative is to route everything through Instinct.
+- **Q-H: what is Instinct's WhatsApp number?** It's only needed for the prefilled `wa.me` "approve this option" link. Without it, the app shows the text with a copy button.
+- **Q-I: which result fields may the group see?** The default is: venue, time, party size, price (with total or quote marked) and the cancellation summary. Provider references and raw sources stay organiser-only.
+- Older open questions (LLM budget, Google Places key) still apply to the direct path.
