@@ -21,10 +21,16 @@ export const envSchema = z.object({
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default("Plan <plans@localhost>"),
 
-  /** Comma list of verifier ids to enable, e.g. "mock" or "mock,royalparks". */
-  VERIFIERS: z.string().default("mock"),
-  /** Must be true (written permission on file) before the Royal Parks verifier may run. */
+  /** Comma list of verifier ids to enable. */
+  VERIFIERS: z.string().default("mock,playtomic,royalparks"),
+  /**
+   * Gates for real sources: set true only when permission to read the source automatically is on file
+   * (see docs/adapters/*.md). Off by default so a fresh checkout never hits third-party sites.
+   */
   ROYALPARKS_PERMISSION_ON_FILE: bool,
+  PLAYTOMIC_PERMISSION_ON_FILE: bool,
+  /** Set once Playtomic slot times have been confirmed as London-local during BST. */
+  PLAYTOMIC_BST_VERIFIED: bool,
 });
 
 export type Env = z.infer<typeof envSchema>;

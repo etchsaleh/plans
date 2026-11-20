@@ -4,7 +4,8 @@ import { parseEnv } from "./env";
 describe("env", () => {
   it("has working dev defaults", () => {
     const e = parseEnv({});
-    expect(e.VERIFIERS).toBe("mock");
+    expect(e.VERIFIERS).toBe("mock,playtomic,royalparks");
+    expect(e.PLAYTOMIC_PERMISSION_ON_FILE).toBe(false);
     expect(e.ROYALPARKS_PERMISSION_ON_FILE).toBe(false);
   });
 

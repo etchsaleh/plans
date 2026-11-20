@@ -15,7 +15,9 @@
     "db:start": "scripts/dev-db.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
-    "test:db": "TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgres://plan@localhost:5433/plan_test} vitest run .db.test"
+    "test:db": "TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgres://plan@localhost:5433/plan_test} vitest run .db.test",
+    "check": "tsx --env-file-if-exists=.env.local scripts/check.ts",
+    "db:seed:venues": "tsx --env-file-if-exists=.env.local scripts/seed-venues.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.5.0",

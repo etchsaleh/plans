@@ -1,3 +1,28 @@
+# Adapters: status
+
+## Live checks enabled (2026-11-20)
+
+The project owner confirmed on 2026-11-20 that we have permission to read these sources automatically. Keep the written permissions on file. Each source is gated by its own env flag, and all of them are off unless set:
+
+| Source | Verifier | What it reads | Requests per check | Flag |
+|---|---|---|---|---|
+| Playtomic (Battersea Park Millennium Arena padel, and more clubs to add) | `PlaytomicVerifier` | `GET playtomic.com/api/clubs/availability?tenant_id=…&date=…&sport_id=PADEL`. This is the document the public club page loads (seen in the browser on 2026-11-20): a list of free start times per court | 1 per club, date and sport, cached for 3 min | `PLAYTOMIC_PERMISSION_ON_FILE` |
+| Royal Parks (Hyde Park, Regent's Park, Greenwich: tennis and padel) | `RoyalParksVerifier` | the public HTML timetable `sportsandleisure.royalparks.org.uk/availability?location=…&calendar_date=…&page=N`. Only bookable slots are listed, 5 per page, in time order | about 4 to 16 on a cold cache (gallop then binary search, capped at 20), then cached for 3 min | `ROYALPARKS_PERMISSION_ON_FILE` |
+
+Rules every live verifier follows, enforced by `PoliteHttp` and the decorators:
+- one request at a time per host, at least 2 seconds apart;
+- an honest `PlanAvailabilityBot` User-Agent, with **no spoofed browser or Origin headers**;
+- caching for 5 minutes at most, and a cache hit keeps the time the source was actually read;
+- every check is written to `availability_snapshots`, with the raw payload in `verification_payloads`.
+
+**Not used:** the Royal Parks booking system's JSON API (`flow.onl`). It only answers requests that carry the booking site's Origin header, and this project doesn't spoof headers. If the Royal Parks or flow.onl give us an API key or allow-list us, it would replace up to 20 timetable pages with a single request per park and date.
+
+**Still link-only:** ClubSpark (Battersea tennis). Cloudflare blocks automated clients, and we don't get around bot protection, so this needs a feed from Enable. Restaurants are also link-only (see below).
+
+**Known gap:** Playtomic slot times match London local time in GMT. Whether they're London local or UTC during BST is unconfirmed, so between late March and October the verifier returns UNKNOWN until `PLAYTOMIC_BST_VERIFIED=true`.
+
+---
+
 # Adapter research: summary (2026-11-20)
 
 The question: can Plan **legitimately read live availability** from each source automatically, with no partner agreement? Each verdict below comes from the source's robots.txt, its terms and how its endpoints behave. All of this was fetched from this sandbox on 2026-11-20. Where I couldn't fetch something, the entry says so.
