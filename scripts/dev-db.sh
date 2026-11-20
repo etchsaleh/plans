@@ -18,7 +18,7 @@ RUNAS=(); [[ $(id -u) == 0 ]] && RUNAS=(sudo -u postgres)
 if ! "${RUNAS[@]}" "$PGBIN/pg_ctl" -D "$DATA" status >/dev/null 2>&1; then
   "${RUNAS[@]}" "$PGBIN/pg_ctl" -D "$DATA" -o "-p $PORT -k /tmp" -l "$DATA/server.log" start >/dev/null
 fi
-for db in plan plan_test; do
+for db in plan plan_test plan_e2e; do
   "$PGBIN/psql" -h localhost -p "$PORT" -U plan -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1 \
     || "$PGBIN/createdb" -h localhost -p "$PORT" -U plan "$db"
 done

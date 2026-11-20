@@ -10,7 +10,10 @@ npm run db:start            # local Postgres on :5433 (or: docker compose up -d)
 cp .env.example .env.local  # live checks are enabled here; set the *_PERMISSION_ON_FILE flags to false to turn them off
 npm run db:seed:venues      # migrate + load the London venue catalogue
 npm run dev                 # http://localhost:3000  (UI kit: /dev/ui)
+npm run worker              # background checks (or set JOBS_MODE=inline in .env.local for dev)
 ```
+
+Sign in at `/` with an organiser email. In dev the magic link appears at `/dev/mailbox`. Tap **+**, then fill in "What's the plan?", then share the link. Friends join by entering just a name, say if they're in, and 👍/👎 options. You choose one, approve the booking outside the app (WhatsApp/venue), and record the venue's booking reference. **The app never books or charges.**
 
 ## Live availability checks
 
@@ -43,6 +46,9 @@ See [`.env.example`](.env.example). Highlights:
 | `VERIFIERS` | `mock,playtomic,royalparks` | which verifiers to build |
 | `PLAYTOMIC_PERMISSION_ON_FILE` / `ROYALPARKS_PERMISSION_ON_FILE` | `false` | gates for live third-party reads |
 | `PLAYTOMIC_BST_VERIFIED` | `false` | allow Playtomic checks during British Summer Time |
+| `ORGANIZER_EMAILS` | empty (dev: anyone) | who may sign in as organiser. **Required in production** |
+| `JOBS_MODE` | `pgboss` | `inline` runs searches in the web process (dev/e2e only) |
+| `SMTP_URL` / `DEV_MAILBOX` | – | magic-link delivery; `DEV_MAILBOX=true` keeps links in `/dev/mailbox` |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | – | optional LLM ranker (it never decides availability) |
 
 ## Adding a verifier adapter

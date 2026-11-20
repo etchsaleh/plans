@@ -16,7 +16,18 @@ export default defineConfig({
     { name: "iphone", use: { ...devices["iPhone 15"], browserName: "chromium" } },
   ],
   webServer: {
-    command: `npm run start -- -p ${PORT}`,
+    // Production build + mock verifier + in-process jobs; magic links land in /dev/mailbox.
+    command: `npm run db:seed:venues && npm run start -- -p ${PORT}`,
+    env: {
+      APP_URL: `http://localhost:${PORT}`,
+      DATABASE_URL: process.env.E2E_DATABASE_URL ?? "postgres://plan@localhost:5433/plan_e2e",
+      COOKIE_SECRET: "e2e-cookie-secret-e2e-cookie-secret-123456",
+      ORGANIZER_EMAILS: "organizer@example.test",
+      DEV_MAILBOX: "true",
+      JOBS_MODE: "inline",
+      VERIFIERS: "mock",
+      LOG_LEVEL: "warn",
+    },
     port: PORT,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

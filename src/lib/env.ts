@@ -22,6 +22,8 @@ export const envSchema = z.object({
   /** Optional: without it magic links are printed to the log and /dev/mailbox. */
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default("Plan <plans@localhost>"),
+  /** Explicit opt-in to keep magic links in the local /dev/mailbox (dev + e2e of production builds). Never in real deployments. */
+  DEV_MAILBOX: bool,
 
   /** "pgboss" (default; needs `npm run worker`) or "inline" (dev/e2e: run searches in the web process). */
   JOBS_MODE: z.enum(["pgboss", "inline"]).default("pgboss"),
@@ -47,7 +49,7 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
   if (env.NODE_ENV === "production" && !env.ORGANIZER_EMAILS.trim()) {
     throw new Error("ORGANIZER_EMAILS must be set in production");
   }
-  if (env.NODE_ENV === "production" && !env.SMTP_URL) {
+  if (env.NODE_ENV === "production" && !env.SMTP_URL && !env.DEV_MAILBOX) {
     throw new Error("SMTP_URL must be set in production (magic links)");
   }
   return env;
