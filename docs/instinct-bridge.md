@@ -1,6 +1,6 @@
 # Instinct email bridge: design (app side)
 
-Status: **designed, not built, live mode off.** This is our proposed app-side implementation and email contract. It is
+Status: **deferred (owner, 2026-11-20). Designed, not built, live mode off.** This is our proposed app-side implementation and email contract. It is
 **not** a documented Instinct API or an active integration. Before any real request is sent, the mailbox, the permitted
 actions, the response and disclosure contract, and one non-booking round trip must be agreed with Instinct over WhatsApp
 (see §8). The destination `6i7ppo@mail.instinct.com` was supplied by the owner. It still needs confirming during setup.

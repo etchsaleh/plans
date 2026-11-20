@@ -51,6 +51,7 @@ export default defineConfig([
       "import/resolver": { typescript: { alwaysTryTypes: true } },
     },
     rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "boundaries/dependencies": [
         "error",
         {

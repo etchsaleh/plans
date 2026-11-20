@@ -1,6 +1,6 @@
 # Plan — MVP build plan (v3)
 
-Status: **v3 draft, awaiting your OK.** This version adds the **Instinct email bridge** (full design in [`instinct-bridge.md`](instinct-bridge.md)). Live checks against Playtomic and the Royal Parks are built and gated (see [adapters status](adapters/README.md)).
+Status: **v3. Slice A is in progress. The Instinct bridge is deferred by the owner (2026-11-20): it's designed only, with no code, tables or mail adapters until you say so.** This version adds the **Instinct email bridge** (full design in [`instinct-bridge.md`](instinct-bridge.md)). Live checks against Playtomic and the Royal Parks are built and gated (see [adapters status](adapters/README.md)).
 
 What v3 changes and why:
 
