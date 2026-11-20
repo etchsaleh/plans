@@ -1,6 +1,6 @@
 # Plan — MVP build plan (v2)
 
-Status: **v2. Product flow simplified per your feedback, and adapter research done.** The research changes what "verified" can honestly mean, so §2 needs your call before Slice 3.
+Status: **v2.1.** Live checks are enabled for Playtomic and the Royal Parks, with the owner confirming permission on 2026-11-20 (see [adapters status](adapters/README.md)). The HUMAN tier stays as the fallback for link-only venues.
 
 Changes since v1: there's no group setup and no roster of names. Quorum is now **party size**. Hosts don't need to log in. There's a check-tier ladder (§2), and a Spell UI / iOS layer (§8).
 
